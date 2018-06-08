@@ -8,9 +8,46 @@ namespace CS_Json
 {
     internal class Program
     {
+        private static bool IsValidJson(string s)
+        {
+            if ((s.StartsWith("{") && s.EndsWith("}")) || (s.StartsWith("[") && s.EndsWith("]")))
+            {
+                try
+                {
+                    var obj = JToken.Parse(s);
+                    return true;
+                }
+                catch(JsonException e)
+                {
+                    WriteLine(e.Message);
+                    return false;
+                }
+                catch (System.Exception e)
+                {
+                    WriteLine(e.Message);
+                    return false;
+                }
+            }
+            else
+            {
+                WriteLine("Not valid!");
+                return false;
+            }
+        }
+
         private static IEnumerable<dynamic> Read(string json)
         {
-            return JsonConvert.DeserializeObject<IEnumerable<dynamic>>(json);
+            if (IsValidJson(json))
+                try
+                {
+                    return JsonConvert.DeserializeObject<IEnumerable<dynamic>>(json);
+                }
+                catch (System.Exception e)
+                {
+                    WriteLine(e.Message);
+                    return null;
+                }
+            return null;
         }
 
         private static void RecombiningTypeA(IEnumerable<dynamic> input)
@@ -22,7 +59,17 @@ namespace CS_Json
             }
             for (int i = 0; i < dict.Count; i++)
             {
-                dict.ElementAt(i).Value.AddRange(input.Skip(1).Select(e => e[i]).ToList());
+                for (int j = 1; j < input.Count(); j++)
+                {
+                    try
+                    {
+                        dict.ElementAt(i).Value.Add(input.ElementAt(j)[i]);
+                    }
+                    catch (System.Exception e)
+                    {
+                        dict.ElementAt(i).Value.Add(null);
+                    }
+                }                
             }
 
             WriteLine(JsonConvert.SerializeObject(dict));
@@ -70,15 +117,32 @@ namespace CS_Json
 
         private static void Main(string[] args)
         {
-            WriteLine("Enter json string: ");
-            var json = Read(ReadLine());
-            if ((json.FirstOrDefault()).GetType() == typeof(JArray))
+            var flag = false;
+            do
             {
-                RecombiningTypeA(json);
-            }
-            else
-                RecombiningTypeB(json);
-            ReadKey();
+                WriteLine();
+                WriteLine("Enter json string (enter 'e' to exit): ");
+                var s = ReadLine().Trim();
+                if (s == "e" || s == "E")
+                {
+                    flag = true;
+                    continue;
+                }
+
+                s = System.Text.RegularExpressions.Regex.Replace(s,
+                    @"((([A-Za-z]+[\w@]*|[\d.]+[A-Za-z]+[\w@]*|\S*@+\S*)\b(?<!\bnull)\b)+|(""+[\d.]+|[\d.]+"")+|(""[\w]+|[\w]""+|[\w]+@+)+)",
+                    @"""$1""");
+                s = System.Text.RegularExpressions.Regex.Replace(s, @"""+", @"""");
+                
+                var json = Read(s);
+                if (json != null)
+                {
+                    if ((json.FirstOrDefault()).GetType() == typeof(JArray))
+                        RecombiningTypeA(json);
+                    else if ((json.FirstOrDefault()).GetType() == typeof(JObject))
+                        RecombiningTypeB(json);
+                }
+            } while (!flag);
         }
     }
 }
